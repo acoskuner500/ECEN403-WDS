@@ -5,6 +5,7 @@ import android.view.View
 import androidx.fragment.app.Fragment
 import android.widget.ImageButton
 import android.content.SharedPreferences
+import android.os.Bundle
 import com.example.wds.R
 
 class ChooseFragment : Fragment(R.layout.fragment_choose) {
@@ -23,9 +24,9 @@ class ChooseFragment : Fragment(R.layout.fragment_choose) {
         )
     }
 
-    override fun onResume() {
-        super.onResume()
-        btnArray = view?.let { createBtnArray(it) }!!
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        btnArray = createBtnArray(view)
         loadData(btnArray)
         for (btn in btnArray) {
             btn.setOnClickListener {
@@ -71,8 +72,7 @@ class ChooseFragment : Fragment(R.layout.fragment_choose) {
 //    }
 
     private fun saveData(btnArray: Array<ImageButton>) {
-        val prefs = makeSharedPrefs()
-        prefs.edit().apply {
+        prefs().edit().apply {
 //            putInt(numSelKey, numSelected)
             for (btn in btnArray) {
                 putBoolean(btnSelKey + btn.id.toString(), btn.isSelected)
@@ -82,22 +82,21 @@ class ChooseFragment : Fragment(R.layout.fragment_choose) {
     }
 
     private fun loadData(btnArray: Array<ImageButton>) {
-        val prefs = makeSharedPrefs()
-//        numSelected = prefs.getInt(numSelKey, 0)
+//        numSelected = prefs().getInt(numSelKey, 0)
 //        if (numSelected == 0) {
 //            for (btn in btnArray) {
 //                btn.isEnabled = true
 //                btn.isSelected = false
 //            }
 //        } else {
-        for (btn in btnArray) {
-            btn.isSelected = prefs.getBoolean(btnSelKey + btn.id.toString(), false)
-//                btn.isEnabled = prefs.getBoolean(btnEnKey + btn.id.toString(), true)
-        }
+            for (btn in btnArray) {
+                btn.isSelected = prefs().getBoolean(btnSelKey + btn.id.toString(), false)
+//                btn.isEnabled = prefs().getBoolean(btnEnKey + btn.id.toString(), true)
+            }
 //        }
     }
 
-    private fun makeSharedPrefs(): SharedPreferences {
+    private fun prefs(): SharedPreferences {
         return requireContext().getSharedPreferences(prefsKey, Context.MODE_PRIVATE)
     }
 }
