@@ -1,10 +1,10 @@
 package com.example.wds.fragments.verify
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
@@ -18,6 +18,8 @@ import com.example.wds.R
 import com.example.wds.entry.Entry
 import com.example.wds.entry.EntryViewModel
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.yuyakaido.android.cardstackview.*
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -34,23 +36,23 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
     private lateinit var acceptBtn : FloatingActionButton
     private lateinit var rejectBtn : FloatingActionButton
     private lateinit var tvVerify : TextView
-    private val cardStackList = ArrayList<Entry>()
+    private var cardStackList = ArrayList<Entry>()
     private val acceptList = ArrayList<Entry>()
     private val rejectList = ArrayList<Entry>()
     private val actionList = ArrayList<Boolean>()
     private var topEntry: Entry? = null
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-//        println("DEBUG onCreateView()")
-        val root = inflater.inflate(R.layout.fragment_verify, container, false)
+    companion object {
+        private const val prefsKey = "prefsKey"
+        private const val cardStackKey = "cardStackKey"
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         entryViewModel = ViewModelProvider(this).get(EntryViewModel::class.java)
-        initialize(root)
+        loadData()
+        initialize(view)
         setupButtons()
-        return root
     }
 
     override fun onPause() {
@@ -61,6 +63,7 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
         acceptList.clear()
         rejectList.clear()
         actionList.clear()
+        saveData()
         super.onPause()
     }
 
@@ -71,28 +74,21 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
     override fun onCardSwiped(direction: Direction?) {
         println("DEBUG onCardSwiped: d = $direction")
         if (direction == Direction.Right) {
-//            accept()
             actionList.add(0, true)
             topEntry?.let { acceptList.add(0, it) }
-            cardStackList.removeAt(0)
-            adapter.notifyDataSetChanged()
         }
         if (direction == Direction.Left) {
-//            reject()
             actionList.add(0, false)
             topEntry?.let { rejectList.add(0, it) }
-            cardStackList.removeAt(0)
-            adapter.notifyDataSetChanged()
         }
+        cardStackList.removeAt(0)
+        adapter.notifyDataSetChanged()
         bgtvVisibility()
     }
 
     override fun onCardRewound() {
 //        println("DEBUG onCardRewound: ${manager.topPosition}")
-//        if (actionList[0]) acceptList.removeAt(0)
-//        else rejectList.removeAt(0)
-//        actionList.removeAt(0)
-//        bgtvVisibility()
+        bgtvVisibility()
     }
 
     override fun onCardCanceled() {
@@ -109,9 +105,10 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
 //        println("DEBUG disappeared")
     }
 
-    private fun initialize(root: View) {
+    private fun initialize(view: View) {
 //        println("DEBUG initialize()")
-        cardStackView = root.findViewById(R.id.card_stack_view)
+        cardStackView = view.findViewById(R.id.card_stack_view)
+        cardStackView.setHasFixedSize(true)
         manager = CardStackLayoutManager(context, this)
         adapter = CardStackAdapter(cardStackList)
         manager.setStackFrom(StackFrom.Bottom)
@@ -132,44 +129,39 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
                 supportsChangeAnimations = false
             }
         }
-        btnAdd = root.findViewById(R.id.btnAdd)!!
-        undoBtn = root.findViewById(R.id.undoBtn)!!
-        acceptBtn = root.findViewById(R.id.acceptBtn)!!
-        rejectBtn = root.findViewById(R.id.rejectBtn)!!
-        tvVerify = root.findViewById(R.id.tvVerify)!!
+        btnAdd = view.findViewById(R.id.btnAdd)!!
+        undoBtn = view.findViewById(R.id.undoBtn)!!
+        acceptBtn = view.findViewById(R.id.acceptBtn)!!
+        rejectBtn = view.findViewById(R.id.rejectBtn)!!
+        tvVerify = view.findViewById(R.id.tvVerify)!!
         bgtvVisibility()
     }
 
     private fun setupButtons() {
 //        println("DEBUG setupButtons()")
         btnAdd.setOnClickListener {
-            cardStackList.add(addNewEntry())
+            cardStackList.add(randomEntry())
+            adapter.notifyDataSetChanged()
         }
 
         undoBtn.setOnClickListener {
             if (actionList.size > 0) {
                 println("DEBUG undoBtn clicked")
-                val setting : RewindAnimationSetting
-                if (actionList[0]) {
-                    setting = RewindAnimationSetting.Builder()
-                        .setDirection(Direction.Right)
+                manager.setRewindAnimationSetting(
+                    RewindAnimationSetting.Builder()
+                        .setDirection(Direction.Bottom)
                         .setDuration(Duration.Normal.duration)
                         .setInterpolator(DecelerateInterpolator())
                         .build()
+                )
+                if (actionList[0]) {
                     cardStackList.add(0, acceptList[0])
                     acceptList.removeAt(0)
-                    actionList.removeAt(0)
                 } else {
-                    setting = RewindAnimationSetting.Builder()
-                        .setDirection(Direction.Left)
-                        .setDuration(Duration.Normal.duration)
-                        .setInterpolator(DecelerateInterpolator())
-                        .build()
                     cardStackList.add(0, rejectList[0])
                     rejectList.removeAt(0)
-                    actionList.removeAt(0)
                 }
-                manager.setRewindAnimationSetting(setting)
+                actionList.removeAt(0)
                 cardStackView.rewind()
                 adapter.notifyDataSetChanged()
             }
@@ -178,12 +170,6 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
         acceptBtn.setOnClickListener {
             if (cardStackList.size > 0) {
                 println("DEBUG acceptBtn clicked")
-//                accept()
-//                actionList.add(0, true)
-//                topEntry?.let { acceptList.add(0, it) }
-//                cardStackList.removeAt(0)
-//                adapter.notifyDataSetChanged()
-
                 manager.setSwipeAnimationSetting(
                     SwipeAnimationSetting.Builder()
                         .setDirection(Direction.Right)
@@ -198,12 +184,6 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
         rejectBtn.setOnClickListener {
             if (cardStackList.size > 0) {
                 println("DEBUG rejectBtn clicked")
-//                reject()
-//                actionList.add(0, false)
-//                topEntry?.let { rejectList.add(0, it) }
-//                cardStackList.removeAt(0)
-//                adapter.notifyDataSetChanged()
-
                 manager.setSwipeAnimationSetting(
                     SwipeAnimationSetting.Builder()
                         .setDirection(Direction.Left)
@@ -216,24 +196,8 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
         }
     }
 
-//    private fun accept() {
-//        println("DEBUG accept()")
-//        actionList.add(0, true)
-//        topEntry?.let { acceptList.add(0, it) }
-//        cardStackList.removeAt(0)
-//        adapter.notifyDataSetChanged()
-//    }
-
-//    private fun reject() {
-//        println("DEBUG reject()")
-//        actionList.add(0, false)
-//        topEntry?.let { rejectList.add(0, it) }
-//        cardStackList.removeAt(0)
-//        adapter.notifyDataSetChanged()
-//    }
-
     // New Dummy Instance
-    private fun addNewEntry(): Entry {
+    private fun randomEntry(): Entry {
 //        println("DEBUG addNewEntry()")
         val current = LocalDateTime.now()
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd\nHH:mm:ss.SSS")
@@ -241,11 +205,26 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
         val num = Random.nextInt(1084)
         val imgSrc = "https://picsum.photos/400/300/?image=$num"
         val textAnimal = "Pic $num"
-        adapter.notifyDataSetChanged()
         return Entry(0, imgSrc, textAnimal, textTime)
     }
 
     private fun bgtvVisibility() {
         tvVerify.visibility = if (cardStackList.size == 0) View.VISIBLE else View.INVISIBLE
+    }
+
+    private fun saveData() {
+        prefs().edit().apply {
+            putString(cardStackKey, Gson().toJson(cardStackList))
+        }.apply()
+    }
+
+    private fun loadData() {
+        val json = prefs().getString(cardStackKey, null)
+        val type = object : TypeToken<ArrayList<Entry>>() {}.type
+        cardStackList = Gson().fromJson(json,type)
+    }
+
+    private fun prefs(): SharedPreferences {
+        return requireContext().getSharedPreferences(prefsKey, Context.MODE_PRIVATE)
     }
 }

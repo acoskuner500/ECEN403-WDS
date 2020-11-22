@@ -38,6 +38,7 @@ ext {
     cardviewVersion = '1.0.0'
     cardstackviewVersion = '2.3.4'
     glideVersion = '4.10.0'
+    gsonVersion = '2.8.6'
     // testing
     junitVersion = '4.13.1'
     espressoVersion = '3.1.0'
