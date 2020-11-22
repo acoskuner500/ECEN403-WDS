@@ -221,7 +221,7 @@ class VerifyFragment : Fragment(R.layout.fragment_verify), CardStackListener {
     private fun loadData() {
         val json = prefs().getString(cardStackKey, null)
         val type = object : TypeToken<ArrayList<Entry>>() {}.type
-        cardStackList = Gson().fromJson(json,type)
+        if (json != null) cardStackList = Gson().fromJson(json,type)
     }
 
     private fun prefs(): SharedPreferences {
